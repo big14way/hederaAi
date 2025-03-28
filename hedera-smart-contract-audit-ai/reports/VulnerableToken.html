@@ -1,0 +1,421 @@
+
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Security Audit Report: VulnerableToken</title>
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          line-height: 1.6;
+          color: #333;
+          margin: 0;
+          padding: 20px;
+          background-color: #f9f9f9;
+        }
+        
+        .container {
+          max-width: 1200px;
+          margin: 0 auto;
+          background-color: #fff;
+          padding: 20px;
+          box-shadow: 0 0 10px rgba(0,0,0,0.1);
+          border-radius: 5px;
+        }
+        
+        h1, h2, h3, h4 {
+          color: #0066cc;
+        }
+        
+        .header {
+          border-bottom: 2px solid #eee;
+          padding-bottom: 20px;
+          margin-bottom: 20px;
+        }
+        
+        .risk-high {
+          background-color: #ffdddd;
+          border-left: 5px solid #d62c1a;
+          padding: 10px;
+          border-radius: 2px;
+        }
+        
+        .risk-medium {
+          background-color: #ffffcc;
+          border-left: 5px solid #f1c40f;
+          padding: 10px;
+          border-radius: 2px;
+        }
+        
+        .risk-low {
+          background-color: #ddffdd;
+          border-left: 5px solid #2ecc71;
+          padding: 10px;
+          border-radius: 2px;
+        }
+        
+        .risk-minimal {
+          background-color: #e6f2ff;
+          border-left: 5px solid #3498db;
+          padding: 10px;
+          border-radius: 2px;
+        }
+        
+        .summary-card {
+          margin-bottom: 20px;
+          padding: 15px;
+          border-radius: 5px;
+        }
+        
+        .summary-stats {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 10px;
+          margin-top: 10px;
+        }
+        
+        .stat-box {
+          padding: 10px 15px;
+          border-radius: 3px;
+          color: white;
+          font-weight: bold;
+          text-align: center;
+          min-width: 100px;
+        }
+        
+        .critical { background-color: #d62c1a; }
+        .high { background-color: #e67e22; }
+        .medium { background-color: #f1c40f; color: #333; }
+        .low { background-color: #3498db; }
+        .info { background-color: #2ecc71; }
+        
+        .vulnerability {
+          margin-bottom: 30px;
+          border: 1px solid #ddd;
+          border-radius: 5px;
+          padding: 15px;
+        }
+        
+        .vulnerability h3 {
+          margin-top: 0;
+        }
+        
+        .vulnerability-critical { border-left: 5px solid #d62c1a; }
+        .vulnerability-high { border-left: 5px solid #e67e22; }
+        .vulnerability-medium { border-left: 5px solid #f1c40f; }
+        .vulnerability-low { border-left: 5px solid #3498db; }
+        .vulnerability-informational { border-left: 5px solid #2ecc71; }
+        
+        pre {
+          background-color: #f8f8f8;
+          border: 1px solid #ddd;
+          border-radius: 3px;
+          padding: 10px;
+          overflow-x: auto;
+          font-family: 'Courier New', monospace;
+          font-size: 14px;
+        }
+        
+        .affected-code {
+          margin-top: 10px;
+          margin-bottom: 10px;
+        }
+        
+        .hljs-line {
+          display: block;
+          line-height: 1.5;
+        }
+        
+        .hljs-line-highlight {
+          background-color: rgba(255, 160, 122, 0.3);
+        }
+        
+        .line-number {
+          display: inline-block;
+          width: 3em;
+          padding-right: 1em;
+          text-align: right;
+          color: #999;
+          user-select: none;
+        }
+        
+        .code-snippet {
+          margin-top: 20px;
+        }
+        
+        .footer {
+          margin-top: 50px;
+          text-align: center;
+          color: #777;
+          font-size: 0.9em;
+        }
+        
+        .tabs {
+          display: flex;
+          border-bottom: 1px solid #ddd;
+          margin-bottom: 20px;
+        }
+        
+        .tab {
+          padding: 10px 20px;
+          cursor: pointer;
+          border: 1px solid transparent;
+          border-bottom: none;
+        }
+        
+        .tab.active {
+          border-color: #ddd;
+          border-radius: 5px 5px 0 0;
+          background-color: white;
+          margin-bottom: -1px;
+        }
+        
+        .tab-content {
+          display: none;
+        }
+        
+        .tab-content.active {
+          display: block;
+        }
+      </style>
+      <script>
+        function switchTab(tabId) {
+          // Hide all tabs
+          const tabContents = document.querySelectorAll('.tab-content');
+          tabContents.forEach(tab => {
+            tab.classList.remove('active');
+          });
+          
+          // Deactivate all tab buttons
+          const tabs = document.querySelectorAll('.tab');
+          tabs.forEach(tab => {
+            tab.classList.remove('active');
+          });
+          
+          // Show the selected tab
+          document.getElementById(tabId).classList.add('active');
+          document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
+        }
+        
+        function highlightLines(lineNumbers, contractCode) {
+          if (!lineNumbers || lineNumbers.length === 0) return '';
+          
+          const lines = contractCode.split('\n');
+          const buffer = 3; // Show 3 lines before and after each affected line
+          
+          let result = '';
+          let lineToHighlight = new Set(lineNumbers.map(n => parseInt(n)));
+          
+          let linesToShow = new Set();
+          lineNumbers.forEach(lineNum => {
+            const num = parseInt(lineNum);
+            for (let i = Math.max(1, num - buffer); i <= Math.min(lines.length, num + buffer); i++) {
+              linesToShow.add(i);
+            }
+          });
+          
+          const sortedLines = Array.from(linesToShow).sort((a, b) => a - b);
+          
+          let lastLine = 0;
+          for (let i = 0; i < sortedLines.length; i++) {
+            const lineNum = sortedLines[i];
+            
+            // If there's a gap, add ellipsis
+            if (lineNum > lastLine + 1 && lastLine !== 0) {
+              result += '<span class="hljs-line"><span class="line-number">...</span>...</span>\n';
+            }
+            
+            const line = lines[lineNum - 1] || '';
+            const lineClass = lineToHighlight.has(lineNum) ? 'hljs-line-highlight' : '';
+            result += `<span class="hljs-line ${lineClass}"><span class="line-number">${lineNum}</span>${line}</span>\n`;
+            
+            lastLine = lineNum;
+          }
+          
+          return result;
+        }
+      </script>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Hedera Smart Contract Security Audit</h1>
+          <h2>VulnerableToken</h2>
+          <p><strong>Version:</strong> ^0.8.0</p>
+          <p><strong>Date:</strong> 3/28/2025</p>
+        </div>
+        
+        <div class="summary-card risk-medium">
+          <h2>Risk Assessment: Medium</h2>
+          <p>This contract has been analyzed for security vulnerabilities and code quality issues.</p>
+          
+          <div class="summary-stats">
+            <div class="stat-box critical">0 Critical</div>
+            <div class="stat-box high">1 High</div>
+            <div class="stat-box medium">0 Medium</div>
+            <div class="stat-box low">0 Low</div>
+            <div class="stat-box info">0 Info</div>
+          </div>
+        </div>
+        
+        <div class="tabs">
+          <div class="tab active" data-tab="vulnerabilities" onclick="switchTab('vulnerabilities')">Vulnerabilities</div>
+          <div class="tab" data-tab="code" onclick="switchTab('code')">Contract Code</div>
+        </div>
+        
+        <div id="vulnerabilities" class="tab-content active">
+    <h2>High Severity Findings (1)</h2>
+          <div class="vulnerability vulnerability-high">
+            <h3>[1] Potential Reentrancy</h3>
+            <p><strong>Description:</strong> The contract uses low-level call with value. Ensure state changes happen before external calls.</p>
+            <p><strong>Affected Lines:</strong> 36, 112</p>
+            <p><strong>Remediation:</strong> Follow checks-effects-interactions pattern and consider using ReentrancyGuard.</p>
+            
+            <div class="affected-code">
+              <h4>Affected Code:</h4>
+              <pre><code class="language-solidity" id="code-VulnerableToken-fallback-reentrancy-1743163826192"></code></pre>
+              <script>
+                document.getElementById('code-VulnerableToken-fallback-reentrancy-1743163826192').innerHTML = highlightLines([36,112], "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\n/**\n * @title VulnerableToken\n * @dev A deliberately vulnerable ERC20-like token for testing security analysis tools\n * IMPORTANT: This contract contains intentional vulnerabilities for testing purposes.\n * DO NOT use in production!\n */\ncontract VulnerableToken {\n    string public name = \"Vulnerable Token\";\n    string public symbol = \"VULN\";\n    uint8 public decimals = 18;\n    uint256 public totalSupply;\n    \n    mapping(address => uint256) public balanceOf;\n    mapping(address => mapping(address => uint256)) public allowance;\n    \n    // Unsafe state variable - can be manipulated by inheritance\n    bool public paused;\n    \n    // Missing events for transfers and approvals\n    \n    // Unsafe constructor - no access control\n    constructor(uint256 initialSupply) {\n        totalSupply = initialSupply * 10 ** uint256(decimals);\n        balanceOf[msg.sender] = totalSupply;\n    }\n    \n    // Missing function visibility specifier\n    function transfer(address to, uint256 value) public returns (bool success) {\n        // Missing zero-address check\n        // Missing overflow check (though Solidity 0.8.0+ has built-in overflow checking)\n        \n        // Reentrancy vulnerability - state change after transfer\n        (bool sent,) = to.call{value: 0}(\"\");\n        require(sent, \"Failed to send token\");\n        \n        balanceOf[msg.sender] -= value;\n        balanceOf[to] += value;\n        \n        return true;\n    }\n    \n    // Unsafe approve function - doesn't follow check-effects-interactions pattern\n    function approve(address spender, uint256 value) public returns (bool success) {\n        // Missing zero-address check\n        allowance[msg.sender][spender] = value;\n        return true;\n    }\n    \n    // Vulnerable transferFrom - no checks on sender balance\n    function transferFrom(address from, address to, uint256 value) public returns (bool success) {\n        // Missing check if contract is paused\n        \n        // Incorrect allowance check\n        if (allowance[from][msg.sender] >= 0) {\n            allowance[from][msg.sender] -= value;\n            \n            // Missing zero-address check\n            balanceOf[from] -= value;\n            balanceOf[to] += value;\n            return true;\n        }\n        return false;\n    }\n    \n    // Dangerous function - allows arbitrary data execution\n    function executeCode(address target, bytes memory data) public {\n        // Unchecked external call - extremely dangerous\n        (bool success,) = target.call(data);\n        require(success, \"Execution failed\");\n    }\n    \n    // Missing access control - any user can mint tokens\n    function mint(address to, uint256 amount) public {\n        balanceOf[to] += amount;\n        totalSupply += amount;\n    }\n    \n    // Vulnerable to front-running\n    function setTokenPrice(uint256 newPrice) public {\n        // Some price change logic\n        // This function can be front-run\n    }\n    \n    // Unchecked arithmetic (though Solidity 0.8.0+ has built-in overflow checking)\n    function unsafeAdd(uint256 a, uint256 b) public pure returns (uint256) {\n        // No overflow check\n        return a + b;\n    }\n    \n    // Unused storage variables - gas inefficiency\n    uint256 private unusedVar1;\n    uint256 private unusedVar2;\n    \n    // Gas inefficient loop\n    function inefficientLoop(uint256[] memory data) public {\n        uint256 storage_var = 0;\n        \n        for (uint256 i = 0; i < data.length; i++) {\n            // Storage accessed in loop - gas inefficient\n            storage_var += data[i];\n        }\n    }\n    \n    // Function that can potentially be reentered\n    function withdraw(uint256 amount) public {\n        require(balanceOf[msg.sender] >= amount, \"Insufficient balance\");\n        \n        // Reentrancy vulnerability - state change after external call\n        (bool success,) = msg.sender.call{value: amount}(\"\");\n        require(success, \"Transfer failed\");\n        \n        balanceOf[msg.sender] -= amount;\n    }\n    \n    // Use of tx.origin for authorization - vulnerable to phishing\n    function transferOwnership(address newOwner) public {\n        require(tx.origin == msg.sender, \"Not authorized\");\n        // Transfer ownership logic here\n    }\n} ");
+              </script>
+            </div>
+          </div>
+          
+        </div>
+        
+        <div id="code" class="tab-content">
+          <h2>Complete Contract Code</h2>
+          <pre><code class="language-solidity"><span class="hljs-line"><span class="line-number">1</span>// SPDX-License-Identifier: MIT</span>
+<span class="hljs-line"><span class="line-number">2</span>pragma solidity ^0.8.0;</span>
+<span class="hljs-line"><span class="line-number">3</span></span>
+<span class="hljs-line"><span class="line-number">4</span>/**</span>
+<span class="hljs-line"><span class="line-number">5</span> * @title VulnerableToken</span>
+<span class="hljs-line"><span class="line-number">6</span> * @dev A deliberately vulnerable ERC20-like token for testing security analysis tools</span>
+<span class="hljs-line"><span class="line-number">7</span> * IMPORTANT: This contract contains intentional vulnerabilities for testing purposes.</span>
+<span class="hljs-line"><span class="line-number">8</span> * DO NOT use in production!</span>
+<span class="hljs-line"><span class="line-number">9</span> */</span>
+<span class="hljs-line"><span class="line-number">10</span>contract VulnerableToken {</span>
+<span class="hljs-line"><span class="line-number">11</span>    string public name = &quot;Vulnerable Token&quot;;</span>
+<span class="hljs-line"><span class="line-number">12</span>    string public symbol = &quot;VULN&quot;;</span>
+<span class="hljs-line"><span class="line-number">13</span>    uint8 public decimals = 18;</span>
+<span class="hljs-line"><span class="line-number">14</span>    uint256 public totalSupply;</span>
+<span class="hljs-line"><span class="line-number">15</span>    </span>
+<span class="hljs-line"><span class="line-number">16</span>    mapping(address =&gt; uint256) public balanceOf;</span>
+<span class="hljs-line"><span class="line-number">17</span>    mapping(address =&gt; mapping(address =&gt; uint256)) public allowance;</span>
+<span class="hljs-line"><span class="line-number">18</span>    </span>
+<span class="hljs-line"><span class="line-number">19</span>    // Unsafe state variable - can be manipulated by inheritance</span>
+<span class="hljs-line"><span class="line-number">20</span>    bool public paused;</span>
+<span class="hljs-line"><span class="line-number">21</span>    </span>
+<span class="hljs-line"><span class="line-number">22</span>    // Missing events for transfers and approvals</span>
+<span class="hljs-line"><span class="line-number">23</span>    </span>
+<span class="hljs-line"><span class="line-number">24</span>    // Unsafe constructor - no access control</span>
+<span class="hljs-line"><span class="line-number">25</span>    constructor(uint256 initialSupply) {</span>
+<span class="hljs-line"><span class="line-number">26</span>        totalSupply = initialSupply * 10 ** uint256(decimals);</span>
+<span class="hljs-line"><span class="line-number">27</span>        balanceOf[msg.sender] = totalSupply;</span>
+<span class="hljs-line"><span class="line-number">28</span>    }</span>
+<span class="hljs-line"><span class="line-number">29</span>    </span>
+<span class="hljs-line"><span class="line-number">30</span>    // Missing function visibility specifier</span>
+<span class="hljs-line"><span class="line-number">31</span>    function transfer(address to, uint256 value) public returns (bool success) {</span>
+<span class="hljs-line"><span class="line-number">32</span>        // Missing zero-address check</span>
+<span class="hljs-line"><span class="line-number">33</span>        // Missing overflow check (though Solidity 0.8.0+ has built-in overflow checking)</span>
+<span class="hljs-line"><span class="line-number">34</span>        </span>
+<span class="hljs-line"><span class="line-number">35</span>        // Reentrancy vulnerability - state change after transfer</span>
+<span class="hljs-line"><span class="line-number">36</span>        (bool sent,) = to.call{value: 0}(&quot;&quot;);</span>
+<span class="hljs-line"><span class="line-number">37</span>        require(sent, &quot;Failed to send token&quot;);</span>
+<span class="hljs-line"><span class="line-number">38</span>        </span>
+<span class="hljs-line"><span class="line-number">39</span>        balanceOf[msg.sender] -= value;</span>
+<span class="hljs-line"><span class="line-number">40</span>        balanceOf[to] += value;</span>
+<span class="hljs-line"><span class="line-number">41</span>        </span>
+<span class="hljs-line"><span class="line-number">42</span>        return true;</span>
+<span class="hljs-line"><span class="line-number">43</span>    }</span>
+<span class="hljs-line"><span class="line-number">44</span>    </span>
+<span class="hljs-line"><span class="line-number">45</span>    // Unsafe approve function - doesn&#039;t follow check-effects-interactions pattern</span>
+<span class="hljs-line"><span class="line-number">46</span>    function approve(address spender, uint256 value) public returns (bool success) {</span>
+<span class="hljs-line"><span class="line-number">47</span>        // Missing zero-address check</span>
+<span class="hljs-line"><span class="line-number">48</span>        allowance[msg.sender][spender] = value;</span>
+<span class="hljs-line"><span class="line-number">49</span>        return true;</span>
+<span class="hljs-line"><span class="line-number">50</span>    }</span>
+<span class="hljs-line"><span class="line-number">51</span>    </span>
+<span class="hljs-line"><span class="line-number">52</span>    // Vulnerable transferFrom - no checks on sender balance</span>
+<span class="hljs-line"><span class="line-number">53</span>    function transferFrom(address from, address to, uint256 value) public returns (bool success) {</span>
+<span class="hljs-line"><span class="line-number">54</span>        // Missing check if contract is paused</span>
+<span class="hljs-line"><span class="line-number">55</span>        </span>
+<span class="hljs-line"><span class="line-number">56</span>        // Incorrect allowance check</span>
+<span class="hljs-line"><span class="line-number">57</span>        if (allowance[from][msg.sender] &gt;= 0) {</span>
+<span class="hljs-line"><span class="line-number">58</span>            allowance[from][msg.sender] -= value;</span>
+<span class="hljs-line"><span class="line-number">59</span>            </span>
+<span class="hljs-line"><span class="line-number">60</span>            // Missing zero-address check</span>
+<span class="hljs-line"><span class="line-number">61</span>            balanceOf[from] -= value;</span>
+<span class="hljs-line"><span class="line-number">62</span>            balanceOf[to] += value;</span>
+<span class="hljs-line"><span class="line-number">63</span>            return true;</span>
+<span class="hljs-line"><span class="line-number">64</span>        }</span>
+<span class="hljs-line"><span class="line-number">65</span>        return false;</span>
+<span class="hljs-line"><span class="line-number">66</span>    }</span>
+<span class="hljs-line"><span class="line-number">67</span>    </span>
+<span class="hljs-line"><span class="line-number">68</span>    // Dangerous function - allows arbitrary data execution</span>
+<span class="hljs-line"><span class="line-number">69</span>    function executeCode(address target, bytes memory data) public {</span>
+<span class="hljs-line"><span class="line-number">70</span>        // Unchecked external call - extremely dangerous</span>
+<span class="hljs-line"><span class="line-number">71</span>        (bool success,) = target.call(data);</span>
+<span class="hljs-line"><span class="line-number">72</span>        require(success, &quot;Execution failed&quot;);</span>
+<span class="hljs-line"><span class="line-number">73</span>    }</span>
+<span class="hljs-line"><span class="line-number">74</span>    </span>
+<span class="hljs-line"><span class="line-number">75</span>    // Missing access control - any user can mint tokens</span>
+<span class="hljs-line"><span class="line-number">76</span>    function mint(address to, uint256 amount) public {</span>
+<span class="hljs-line"><span class="line-number">77</span>        balanceOf[to] += amount;</span>
+<span class="hljs-line"><span class="line-number">78</span>        totalSupply += amount;</span>
+<span class="hljs-line"><span class="line-number">79</span>    }</span>
+<span class="hljs-line"><span class="line-number">80</span>    </span>
+<span class="hljs-line"><span class="line-number">81</span>    // Vulnerable to front-running</span>
+<span class="hljs-line"><span class="line-number">82</span>    function setTokenPrice(uint256 newPrice) public {</span>
+<span class="hljs-line"><span class="line-number">83</span>        // Some price change logic</span>
+<span class="hljs-line"><span class="line-number">84</span>        // This function can be front-run</span>
+<span class="hljs-line"><span class="line-number">85</span>    }</span>
+<span class="hljs-line"><span class="line-number">86</span>    </span>
+<span class="hljs-line"><span class="line-number">87</span>    // Unchecked arithmetic (though Solidity 0.8.0+ has built-in overflow checking)</span>
+<span class="hljs-line"><span class="line-number">88</span>    function unsafeAdd(uint256 a, uint256 b) public pure returns (uint256) {</span>
+<span class="hljs-line"><span class="line-number">89</span>        // No overflow check</span>
+<span class="hljs-line"><span class="line-number">90</span>        return a + b;</span>
+<span class="hljs-line"><span class="line-number">91</span>    }</span>
+<span class="hljs-line"><span class="line-number">92</span>    </span>
+<span class="hljs-line"><span class="line-number">93</span>    // Unused storage variables - gas inefficiency</span>
+<span class="hljs-line"><span class="line-number">94</span>    uint256 private unusedVar1;</span>
+<span class="hljs-line"><span class="line-number">95</span>    uint256 private unusedVar2;</span>
+<span class="hljs-line"><span class="line-number">96</span>    </span>
+<span class="hljs-line"><span class="line-number">97</span>    // Gas inefficient loop</span>
+<span class="hljs-line"><span class="line-number">98</span>    function inefficientLoop(uint256[] memory data) public {</span>
+<span class="hljs-line"><span class="line-number">99</span>        uint256 storage_var = 0;</span>
+<span class="hljs-line"><span class="line-number">100</span>        </span>
+<span class="hljs-line"><span class="line-number">101</span>        for (uint256 i = 0; i &lt; data.length; i++) {</span>
+<span class="hljs-line"><span class="line-number">102</span>            // Storage accessed in loop - gas inefficient</span>
+<span class="hljs-line"><span class="line-number">103</span>            storage_var += data[i];</span>
+<span class="hljs-line"><span class="line-number">104</span>        }</span>
+<span class="hljs-line"><span class="line-number">105</span>    }</span>
+<span class="hljs-line"><span class="line-number">106</span>    </span>
+<span class="hljs-line"><span class="line-number">107</span>    // Function that can potentially be reentered</span>
+<span class="hljs-line"><span class="line-number">108</span>    function withdraw(uint256 amount) public {</span>
+<span class="hljs-line"><span class="line-number">109</span>        require(balanceOf[msg.sender] &gt;= amount, &quot;Insufficient balance&quot;);</span>
+<span class="hljs-line"><span class="line-number">110</span>        </span>
+<span class="hljs-line"><span class="line-number">111</span>        // Reentrancy vulnerability - state change after external call</span>
+<span class="hljs-line"><span class="line-number">112</span>        (bool success,) = msg.sender.call{value: amount}(&quot;&quot;);</span>
+<span class="hljs-line"><span class="line-number">113</span>        require(success, &quot;Transfer failed&quot;);</span>
+<span class="hljs-line"><span class="line-number">114</span>        </span>
+<span class="hljs-line"><span class="line-number">115</span>        balanceOf[msg.sender] -= amount;</span>
+<span class="hljs-line"><span class="line-number">116</span>    }</span>
+<span class="hljs-line"><span class="line-number">117</span>    </span>
+<span class="hljs-line"><span class="line-number">118</span>    // Use of tx.origin for authorization - vulnerable to phishing</span>
+<span class="hljs-line"><span class="line-number">119</span>    function transferOwnership(address newOwner) public {</span>
+<span class="hljs-line"><span class="line-number">120</span>        require(tx.origin == msg.sender, &quot;Not authorized&quot;);</span>
+<span class="hljs-line"><span class="line-number">121</span>        // Transfer ownership logic here</span>
+<span class="hljs-line"><span class="line-number">122</span>    }</span>
+<span class="hljs-line"><span class="line-number">123</span>} </span>
+</code></pre>
+        </div>
+        
+        <div class="footer">
+          <p>Generated by Hedera Smart Contract Audit AI on 3/28/2025, 1:10:26 PM</p>
+          <p>This report is provided for informational purposes only and does not constitute professional advice.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+    

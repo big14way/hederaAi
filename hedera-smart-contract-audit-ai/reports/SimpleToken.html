@@ -1,0 +1,351 @@
+
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Security Audit Report: SimpleToken</title>
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          line-height: 1.6;
+          color: #333;
+          margin: 0;
+          padding: 20px;
+          background-color: #f9f9f9;
+        }
+        
+        .container {
+          max-width: 1200px;
+          margin: 0 auto;
+          background-color: #fff;
+          padding: 20px;
+          box-shadow: 0 0 10px rgba(0,0,0,0.1);
+          border-radius: 5px;
+        }
+        
+        h1, h2, h3, h4 {
+          color: #0066cc;
+        }
+        
+        .header {
+          border-bottom: 2px solid #eee;
+          padding-bottom: 20px;
+          margin-bottom: 20px;
+        }
+        
+        .risk-high {
+          background-color: #ffdddd;
+          border-left: 5px solid #d62c1a;
+          padding: 10px;
+          border-radius: 2px;
+        }
+        
+        .risk-medium {
+          background-color: #ffffcc;
+          border-left: 5px solid #f1c40f;
+          padding: 10px;
+          border-radius: 2px;
+        }
+        
+        .risk-low {
+          background-color: #ddffdd;
+          border-left: 5px solid #2ecc71;
+          padding: 10px;
+          border-radius: 2px;
+        }
+        
+        .risk-minimal {
+          background-color: #e6f2ff;
+          border-left: 5px solid #3498db;
+          padding: 10px;
+          border-radius: 2px;
+        }
+        
+        .summary-card {
+          margin-bottom: 20px;
+          padding: 15px;
+          border-radius: 5px;
+        }
+        
+        .summary-stats {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 10px;
+          margin-top: 10px;
+        }
+        
+        .stat-box {
+          padding: 10px 15px;
+          border-radius: 3px;
+          color: white;
+          font-weight: bold;
+          text-align: center;
+          min-width: 100px;
+        }
+        
+        .critical { background-color: #d62c1a; }
+        .high { background-color: #e67e22; }
+        .medium { background-color: #f1c40f; color: #333; }
+        .low { background-color: #3498db; }
+        .info { background-color: #2ecc71; }
+        
+        .vulnerability {
+          margin-bottom: 30px;
+          border: 1px solid #ddd;
+          border-radius: 5px;
+          padding: 15px;
+        }
+        
+        .vulnerability h3 {
+          margin-top: 0;
+        }
+        
+        .vulnerability-critical { border-left: 5px solid #d62c1a; }
+        .vulnerability-high { border-left: 5px solid #e67e22; }
+        .vulnerability-medium { border-left: 5px solid #f1c40f; }
+        .vulnerability-low { border-left: 5px solid #3498db; }
+        .vulnerability-informational { border-left: 5px solid #2ecc71; }
+        
+        pre {
+          background-color: #f8f8f8;
+          border: 1px solid #ddd;
+          border-radius: 3px;
+          padding: 10px;
+          overflow-x: auto;
+          font-family: 'Courier New', monospace;
+          font-size: 14px;
+        }
+        
+        .affected-code {
+          margin-top: 10px;
+          margin-bottom: 10px;
+        }
+        
+        .hljs-line {
+          display: block;
+          line-height: 1.5;
+        }
+        
+        .hljs-line-highlight {
+          background-color: rgba(255, 160, 122, 0.3);
+        }
+        
+        .line-number {
+          display: inline-block;
+          width: 3em;
+          padding-right: 1em;
+          text-align: right;
+          color: #999;
+          user-select: none;
+        }
+        
+        .code-snippet {
+          margin-top: 20px;
+        }
+        
+        .footer {
+          margin-top: 50px;
+          text-align: center;
+          color: #777;
+          font-size: 0.9em;
+        }
+        
+        .tabs {
+          display: flex;
+          border-bottom: 1px solid #ddd;
+          margin-bottom: 20px;
+        }
+        
+        .tab {
+          padding: 10px 20px;
+          cursor: pointer;
+          border: 1px solid transparent;
+          border-bottom: none;
+        }
+        
+        .tab.active {
+          border-color: #ddd;
+          border-radius: 5px 5px 0 0;
+          background-color: white;
+          margin-bottom: -1px;
+        }
+        
+        .tab-content {
+          display: none;
+        }
+        
+        .tab-content.active {
+          display: block;
+        }
+      </style>
+      <script>
+        function switchTab(tabId) {
+          // Hide all tabs
+          const tabContents = document.querySelectorAll('.tab-content');
+          tabContents.forEach(tab => {
+            tab.classList.remove('active');
+          });
+          
+          // Deactivate all tab buttons
+          const tabs = document.querySelectorAll('.tab');
+          tabs.forEach(tab => {
+            tab.classList.remove('active');
+          });
+          
+          // Show the selected tab
+          document.getElementById(tabId).classList.add('active');
+          document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
+        }
+        
+        function highlightLines(lineNumbers, contractCode) {
+          if (!lineNumbers || lineNumbers.length === 0) return '';
+          
+          const lines = contractCode.split('\n');
+          const buffer = 3; // Show 3 lines before and after each affected line
+          
+          let result = '';
+          let lineToHighlight = new Set(lineNumbers.map(n => parseInt(n)));
+          
+          let linesToShow = new Set();
+          lineNumbers.forEach(lineNum => {
+            const num = parseInt(lineNum);
+            for (let i = Math.max(1, num - buffer); i <= Math.min(lines.length, num + buffer); i++) {
+              linesToShow.add(i);
+            }
+          });
+          
+          const sortedLines = Array.from(linesToShow).sort((a, b) => a - b);
+          
+          let lastLine = 0;
+          for (let i = 0; i < sortedLines.length; i++) {
+            const lineNum = sortedLines[i];
+            
+            // If there's a gap, add ellipsis
+            if (lineNum > lastLine + 1 && lastLine !== 0) {
+              result += '<span class="hljs-line"><span class="line-number">...</span>...</span>\n';
+            }
+            
+            const line = lines[lineNum - 1] || '';
+            const lineClass = lineToHighlight.has(lineNum) ? 'hljs-line-highlight' : '';
+            result += `<span class="hljs-line ${lineClass}"><span class="line-number">${lineNum}</span>${line}</span>\n`;
+            
+            lastLine = lineNum;
+          }
+          
+          return result;
+        }
+      </script>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Hedera Smart Contract Security Audit</h1>
+          <h2>SimpleToken</h2>
+          <p><strong>Version:</strong> ^0.8.0</p>
+          <p><strong>Date:</strong> 3/28/2025</p>
+        </div>
+        
+        <div class="summary-card risk-minimal">
+          <h2>Risk Assessment: Minimal</h2>
+          <p>This contract has been analyzed for security vulnerabilities and code quality issues.</p>
+          
+          <div class="summary-stats">
+            <div class="stat-box critical">0 Critical</div>
+            <div class="stat-box high">0 High</div>
+            <div class="stat-box medium">0 Medium</div>
+            <div class="stat-box low">0 Low</div>
+            <div class="stat-box info">0 Info</div>
+          </div>
+        </div>
+        
+        <div class="tabs">
+          <div class="tab active" data-tab="vulnerabilities" onclick="switchTab('vulnerabilities')">Vulnerabilities</div>
+          <div class="tab" data-tab="code" onclick="switchTab('code')">Contract Code</div>
+        </div>
+        
+        <div id="vulnerabilities" class="tab-content active">
+    
+      <div class="vulnerability vulnerability-low">
+        <h3>No vulnerabilities found</h3>
+        <p>The analysis did not identify any security issues in this contract. However, this does not guarantee that the contract is free from vulnerabilities.</p>
+      </div>
+      
+        </div>
+        
+        <div id="code" class="tab-content">
+          <h2>Complete Contract Code</h2>
+          <pre><code class="language-solidity"><span class="hljs-line"><span class="line-number">1</span>// SPDX-License-Identifier: MIT</span>
+<span class="hljs-line"><span class="line-number">2</span>pragma solidity ^0.8.0;</span>
+<span class="hljs-line"><span class="line-number">3</span></span>
+<span class="hljs-line"><span class="line-number">4</span>/**</span>
+<span class="hljs-line"><span class="line-number">5</span> * @title SimpleToken</span>
+<span class="hljs-line"><span class="line-number">6</span> * @dev A simple ERC20-like token implementation</span>
+<span class="hljs-line"><span class="line-number">7</span> */</span>
+<span class="hljs-line"><span class="line-number">8</span>contract SimpleToken {</span>
+<span class="hljs-line"><span class="line-number">9</span>    string public name;</span>
+<span class="hljs-line"><span class="line-number">10</span>    string public symbol;</span>
+<span class="hljs-line"><span class="line-number">11</span>    uint8 public decimals;</span>
+<span class="hljs-line"><span class="line-number">12</span>    uint256 public totalSupply;</span>
+<span class="hljs-line"><span class="line-number">13</span>    </span>
+<span class="hljs-line"><span class="line-number">14</span>    mapping(address =&gt; uint256) public balanceOf;</span>
+<span class="hljs-line"><span class="line-number">15</span>    mapping(address =&gt; mapping(address =&gt; uint256)) public allowance;</span>
+<span class="hljs-line"><span class="line-number">16</span>    </span>
+<span class="hljs-line"><span class="line-number">17</span>    event Transfer(address indexed from, address indexed to, uint256 value);</span>
+<span class="hljs-line"><span class="line-number">18</span>    event Approval(address indexed owner, address indexed spender, uint256 value);</span>
+<span class="hljs-line"><span class="line-number">19</span>    </span>
+<span class="hljs-line"><span class="line-number">20</span>    constructor(string memory _name, string memory _symbol, uint8 _decimals, uint256 _initialSupply) {</span>
+<span class="hljs-line"><span class="line-number">21</span>        name = _name;</span>
+<span class="hljs-line"><span class="line-number">22</span>        symbol = _symbol;</span>
+<span class="hljs-line"><span class="line-number">23</span>        decimals = _decimals;</span>
+<span class="hljs-line"><span class="line-number">24</span>        </span>
+<span class="hljs-line"><span class="line-number">25</span>        totalSupply = _initialSupply * (10 ** uint256(decimals));</span>
+<span class="hljs-line"><span class="line-number">26</span>        balanceOf[msg.sender] = totalSupply;</span>
+<span class="hljs-line"><span class="line-number">27</span>        </span>
+<span class="hljs-line"><span class="line-number">28</span>        emit Transfer(address(0), msg.sender, totalSupply);</span>
+<span class="hljs-line"><span class="line-number">29</span>    }</span>
+<span class="hljs-line"><span class="line-number">30</span>    </span>
+<span class="hljs-line"><span class="line-number">31</span>    function transfer(address to, uint256 value) public returns (bool success) {</span>
+<span class="hljs-line"><span class="line-number">32</span>        require(to != address(0), &quot;Transfer to zero address&quot;);</span>
+<span class="hljs-line"><span class="line-number">33</span>        require(balanceOf[msg.sender] &gt;= value, &quot;Insufficient balance&quot;);</span>
+<span class="hljs-line"><span class="line-number">34</span>        </span>
+<span class="hljs-line"><span class="line-number">35</span>        balanceOf[msg.sender] -= value;</span>
+<span class="hljs-line"><span class="line-number">36</span>        balanceOf[to] += value;</span>
+<span class="hljs-line"><span class="line-number">37</span>        </span>
+<span class="hljs-line"><span class="line-number">38</span>        emit Transfer(msg.sender, to, value);</span>
+<span class="hljs-line"><span class="line-number">39</span>        return true;</span>
+<span class="hljs-line"><span class="line-number">40</span>    }</span>
+<span class="hljs-line"><span class="line-number">41</span>    </span>
+<span class="hljs-line"><span class="line-number">42</span>    function approve(address spender, uint256 value) public returns (bool success) {</span>
+<span class="hljs-line"><span class="line-number">43</span>        require(spender != address(0), &quot;Approve to zero address&quot;);</span>
+<span class="hljs-line"><span class="line-number">44</span>        </span>
+<span class="hljs-line"><span class="line-number">45</span>        allowance[msg.sender][spender] = value;</span>
+<span class="hljs-line"><span class="line-number">46</span>        emit Approval(msg.sender, spender, value);</span>
+<span class="hljs-line"><span class="line-number">47</span>        return true;</span>
+<span class="hljs-line"><span class="line-number">48</span>    }</span>
+<span class="hljs-line"><span class="line-number">49</span>    </span>
+<span class="hljs-line"><span class="line-number">50</span>    function transferFrom(address from, address to, uint256 value) public returns (bool success) {</span>
+<span class="hljs-line"><span class="line-number">51</span>        require(from != address(0), &quot;Transfer from zero address&quot;);</span>
+<span class="hljs-line"><span class="line-number">52</span>        require(to != address(0), &quot;Transfer to zero address&quot;);</span>
+<span class="hljs-line"><span class="line-number">53</span>        require(balanceOf[from] &gt;= value, &quot;Insufficient balance&quot;);</span>
+<span class="hljs-line"><span class="line-number">54</span>        require(allowance[from][msg.sender] &gt;= value, &quot;Insufficient allowance&quot;);</span>
+<span class="hljs-line"><span class="line-number">55</span>        </span>
+<span class="hljs-line"><span class="line-number">56</span>        balanceOf[from] -= value;</span>
+<span class="hljs-line"><span class="line-number">57</span>        balanceOf[to] += value;</span>
+<span class="hljs-line"><span class="line-number">58</span>        allowance[from][msg.sender] -= value;</span>
+<span class="hljs-line"><span class="line-number">59</span>        </span>
+<span class="hljs-line"><span class="line-number">60</span>        emit Transfer(from, to, value);</span>
+<span class="hljs-line"><span class="line-number">61</span>        return true;</span>
+<span class="hljs-line"><span class="line-number">62</span>    }</span>
+<span class="hljs-line"><span class="line-number">63</span>} </span>
+</code></pre>
+        </div>
+        
+        <div class="footer">
+          <p>Generated by Hedera Smart Contract Audit AI on 3/28/2025, 1:12:20 PM</p>
+          <p>This report is provided for informational purposes only and does not constitute professional advice.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+    
