@@ -1,82 +1,121 @@
 # Hedera Smart Contract Audit AI
 
-An AI-powered security audit tool for Hedera smart contracts. This tool uses machine learning to identify potential vulnerabilities and gas inefficiencies in Solidity contracts deployed on the Hedera network.
+AI-powered security analysis for smart contracts on the Hedera network.
+
+## Project Overview
+
+Hedera Smart Contract Audit AI leverages artificial intelligence to provide comprehensive security analysis of your smart contracts. The tool scans your Solidity code for vulnerabilities, security issues, and gas inefficiencies, helping developers create more secure and efficient contracts.
+
+![Demo Screenshot](https://example.com/screenshot.png)
 
 ## Features
 
-- **AI-Powered Analysis**: Uses Hugging Face models to identify security issues
-- **Gas Efficiency Check**: Identifies potential gas optimization opportunities
-- **Multiple Contract Support**: Analyze an entire directory of contracts at once
-- **HTML Reports**: Generates detailed HTML reports with highlighted code snippets
-- **Fallback Analysis**: Includes pattern-based fallback analysis for reliability
+- **AI-Powered Security Analysis**: Detect security vulnerabilities using advanced machine learning models
+- **Gas Optimization**: Identify inefficient code patterns to reduce transaction costs
+- **Detailed Reports**: Get comprehensive vulnerability reports with remediation suggestions
+- **Hedera Integration**: Specifically designed for the Hedera network and its unique features
 
-## Installation
+## Hedera Integration
+
+The tool integrates with Hedera in the following ways:
+
+1. **Smart Contract Deployment**: Analyze contracts before deploying them to Hedera
+2. **Hedera Token Service (HTS) Compatibility**: Special checks for HTS interactions
+3. **Gas Optimization**: Specific optimizations for Hedera's gas model
+4. **Hedera Testnet Deployment**: Test contracts securely before mainnet deployment
+
+## Live Demo
+
+A live demo of the application is deployed on Vercel: [https://hedera-smart-contract-audit-ai.vercel.app](https://hedera-smart-contract-audit-ai.vercel.app)
+
+## Project Structure
+
+The project consists of two main components:
+
+- **Frontend**: React-based web interface for submitting contracts and viewing results
+- **Backend**: Node.js server with AI integration for contract analysis (in development)
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js (v14 or higher)
+- npm or yarn
+- Git
+
+### Installation
 
 1. Clone the repository:
-```
-git clone https://github.com/yourusername/hedera-smart-contract-audit-ai.git
-cd hedera-smart-contract-audit-ai
-```
+   ```
+   git clone https://github.com/your-username/hedera-smart-contract-audit-ai.git
+   cd hedera-smart-contract-audit-ai
+   ```
 
-2. Install dependencies:
-```
-npm install
-```
+2. Install frontend dependencies:
+   ```
+   cd frontend
+   npm install
+   ```
 
-3. Set up environment variables:
-Create a `.env` file in the root directory with your Hugging Face API key:
-```
-HUGGINGFACE_API_KEY=your_hugging_face_api_key
-```
+3. Start the development server:
+   ```
+   npm start
+   ```
 
-You can get a free API key by signing up at [Hugging Face](https://huggingface.co/).
+4. Access the application at `http://localhost:3000`
 
-## Usage
+## Deployment
 
-### Analyze a Single Contract
+### Deploying to Vercel
 
-```
-npm start analyze /path/to/your/contract.sol
-```
+1. Fork this repository to your GitHub account
+2. Sign up for [Vercel](https://vercel.com/) if you haven't already
+3. Create a new project on Vercel and connect to your GitHub repository
+4. Configure the project with these settings:
+   - **Framework Preset**: React
+   - **Root Directory**: `frontend`
+   - **Build Command**: `npm run build`
+   - **Output Directory**: `build`
+5. Deploy the project
 
-Options:
-- `-g, --gas`: Enable gas efficiency analysis
-- `-o, --output <directory>`: Specify output directory for HTML reports (default: ./reports)
-- `-v, --verbose`: Enable verbose logging
+### Deploying Smart Contracts to Hedera Testnet
 
-### Analyze Multiple Contracts
+1. Create a Hedera Testnet account at [portal.hedera.com](https://portal.hedera.com)
+2. Use the Hedera SDK to deploy your analyzed smart contracts:
+   ```javascript
+   const { Client, ContractCreateFlow } = require("@hashgraph/sdk");
+   
+   // Initialize client with your testnet account
+   const client = Client.forTestnet();
+   client.setOperator(accountId, privateKey);
+   
+   // Deploy your contract
+   const contractCreateTx = new ContractCreateFlow()
+       .setGas(100000)
+       .setBytecode(contractBytecode);
+   
+   const contractCreateSubmit = await contractCreateTx.execute(client);
+   const contractCreateRx = await contractCreateSubmit.getReceipt(client);
+   
+   console.log(`Contract created with ID: ${contractCreateRx.contractId}`);
+   ```
 
-```
-npm start analyze-dir /path/to/contracts/directory
-```
+## Future Enhancements
 
-This will analyze all `.sol` files in the specified directory and generate individual reports for each contract.
-
-## Output
-
-The tool provides three types of output:
-
-1. **Console Output**: A summary of the findings displayed in the terminal
-2. **Individual HTML Reports**: Detailed reports for each contract with highlighted code snippets
-3. **Summary Report**: When analyzing multiple contracts, a summary report is generated
-
-## Example
-
-```
-npm start analyze ./examples/token.sol --gas
-```
-
-This will:
-1. Analyze the token.sol contract for security vulnerabilities
-2. Check for gas efficiency issues
-3. Generate an HTML report in the ./reports directory
-
-## Limitations
-
-- The AI models may produce false positives or miss certain vulnerabilities
-- The tool is designed to assist developers, not replace manual code review
-- Complex contracts may require more in-depth analysis
+1. **Advanced AI Analysis**: Implementing more sophisticated machine learning models
+2. **Automated Fixes**: Suggesting code fixes for identified vulnerabilities
+3. **Mobile App**: Creating a mobile interface for on-the-go contract analysis
+4. **Integration with Developer Tools**: Creating plugins for VS Code and other IDEs
 
 ## License
 
-MIT 
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgements
+
+- Hedera Hashgraph for their blockchain platform
+- Contributors and supporters of this project
+
+---
+
+*For more information, please watch our demonstration video and review our presentation slides.* 
