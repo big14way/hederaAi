@@ -97,7 +97,7 @@ contract VulnerableToken {
       codeSnippet: {
         start: 22,
         end: 27,
-        code: 'function withdraw() public {\n    uint amount = balanceOf[msg.sender];\n    // Reentrancy vulnerability\n    (bool success, ) = msg.sender.call{value: amount}("");\n    require(success);\n    balanceOf[msg.sender] = 0;\n}'
+        code: 'function withdraw() public {\n    uint amount = balances[msg.sender];\n    // Reentrancy vulnerability\n    (bool success, ) = msg.sender.call{value: amount}("");\n    require(success);\n    balances[msg.sender] = 0;\n}'
       }
     },
     {
@@ -205,34 +205,226 @@ const apiService = {
     
     return new Promise((resolve) => {
       setTimeout(() => {
-        // Check for common vulnerability patterns in the code
-        const hasVulnerabilities = 
-          // Missing balance/value checks
-          (data.contractCode.includes('balanceOf[msg.sender] -= value') && 
-           !data.contractCode.includes('require(balanceOf[msg.sender] >= value')) || 
-          // Reentrancy pattern (external call before state change)
-          (data.contractCode.includes('call{value:') && 
-           data.contractCode.match(/call\{value:.*\}\(.*\)[^]*balanceOf\[.*\]\s*=\s*0/)) || 
-          // Missing zero address check
-          (data.contractCode.includes('function transfer') && 
-           !data.contractCode.includes('require(to != address(0)')) ||
-          // Contains 'vulnerable' in name or comments
-          data.contractName.toLowerCase().includes('vulnerable') || 
-          data.contractCode.toLowerCase().includes('// vulnerable') ||
-          data.contractCode.toLowerCase().includes('/* vulnerable');
+        // Deep scan for vulnerabilities
+        const vulnerabilities = [];
+        const code = data.contractCode;
+        let id = 1;
         
-        if (hasVulnerabilities) {
+        // Check if this is valid Solidity code
+        if (!code.includes('pragma solidity') && !code.includes('contract ')) {
           resolve({
-            ...mockAnalysisResults,
+            id: 'error-101',
             contractName: data.contractName,
-            code: data.contractCode
+            code: data.contractCode,
+            error: 'Invalid Solidity code. Please provide a valid Solidity contract.',
+            vulnerabilities: []
+          });
+          return;
+        }
+        
+        // 1. Reentrancy vulnerabilities
+        if (code.includes('call{value:') || code.includes('.call(') || code.includes('.send(') || code.includes('.transfer(')) {
+          // Check if state changes occur after external calls
+          if (code.match(/call\s*\{.*\}\s*\(.*\)[\s\S]*=/) || 
+              code.match(/\.\s*call\s*\(.*\)[\s\S]*=/) || 
+              code.match(/\.\s*send\s*\(.*\)[\s\S]*=/) ||
+              !code.includes('ReentrancyGuard')) {
+            vulnerabilities.push({
+              id: `vuln-${id++}`,
+              title: 'Potential Reentrancy Vulnerability',
+              severity: 'Critical',
+              description: 'The contract performs state changes after making external calls, which can lead to reentrancy attacks where the called contract can recursively call back into the original function before state updates are applied.',
+              recommendation: 'Implement the checks-effects-interactions pattern: update state before making external calls. Consider using the ReentrancyGuard library from OpenZeppelin.',
+              codeSnippet: {
+                start: code.indexOf('call{value:') > -1 ? code.indexOf('call{value:') : code.indexOf('.call('),
+                end: code.indexOf('call{value:') > -1 ? code.indexOf('call{value:') + 50 : code.indexOf('.call(') + 50,
+                code: code.substring(
+                  Math.max(0, code.indexOf('function', Math.max(0, code.indexOf('call{value:') > -1 ? code.indexOf('call{value:') - 200 : code.indexOf('.call(') - 200))),
+                  code.indexOf('}', code.indexOf('call{value:') > -1 ? code.indexOf('call{value:') + 50 : code.indexOf('.call(') + 50) + 1
+                )
+              }
+            });
+          }
+        }
+        
+        // 2. Missing input validation (common with transfer functions)
+        if (code.includes('function transfer') || code.includes('function send') || code.includes('function transferFrom')) {
+          if (!code.includes('require(') || !code.includes('address(0)')) {
+            vulnerabilities.push({
+              id: `vuln-${id++}`,
+              title: 'Missing Zero Address Validation',
+              severity: 'Medium',
+              description: 'The contract does not validate that the recipient address is not the zero address, which could lead to tokens being permanently lost.',
+              recommendation: 'Add a require statement: require(to != address(0), "Cannot transfer to zero address");',
+              codeSnippet: {
+                start: code.indexOf('function transfer'),
+                end: code.indexOf('function transfer') + 200,
+                code: code.substring(
+                  code.indexOf('function transfer'), 
+                  code.indexOf('}', code.indexOf('function transfer')) + 1
+                )
+              }
+            });
+          }
+        }
+        
+        // 3. Integer overflow/underflow vulnerabilities (for Solidity < 0.8.0)
+        if (code.includes('pragma solidity') && 
+            !code.includes('pragma solidity ^0.8') && 
+            !code.includes('pragma solidity 0.8') &&
+            !code.includes('SafeMath') && 
+            (code.includes('+=') || code.includes('-=') || code.includes('*='))) {
+          vulnerabilities.push({
+            id: `vuln-${id++}`,
+            title: 'Integer Overflow/Underflow Risk',
+            severity: 'High',
+            description: 'The contract uses arithmetic operations without protection against integer overflow or underflow. In Solidity versions prior to 0.8.0, this can lead to unexpected behavior.',
+            recommendation: 'Either upgrade to Solidity 0.8.0 or higher which has built-in overflow checking, or use the SafeMath library for arithmetic operations.',
+            codeSnippet: {
+              start: code.indexOf('pragma solidity'),
+              end: code.indexOf('pragma solidity') + 30,
+              code: code.substring(
+                code.indexOf('pragma solidity'),
+                code.indexOf('\n', code.indexOf('pragma solidity')) + 1
+              )
+            }
+          });
+        }
+        
+        // 4. Unchecked return values
+        if ((code.includes('.call(') && !code.includes('require(')) || 
+            (code.includes('.send(') && !code.includes('require('))) {
+          vulnerabilities.push({
+            id: `vuln-${id++}`,
+            title: 'Unchecked External Call Return Value',
+            severity: 'Medium',
+            description: 'The contract does not check the return value of low-level calls. Failed calls do not revert automatically and can lead to unexpected behavior.',
+            recommendation: 'Always check the return value of low-level calls with require(): require(success, "External call failed");',
+            codeSnippet: {
+              start: code.indexOf('.call('),
+              end: code.indexOf('.call(') + 100,
+              code: code.substring(
+                Math.max(0, code.indexOf('function', Math.max(0, code.indexOf('.call(') - 200))),
+                code.indexOf('}', code.indexOf('.call(') + 20) + 1
+              )
+            }
+          });
+        }
+        
+        // 5. Unprotected functions (missing access control)
+        if (code.includes('function ') && 
+            !code.includes('onlyOwner') && 
+            !code.includes('require(msg.sender') &&
+            (code.includes('selfdestruct') || code.includes('suicide'))) {
+          vulnerabilities.push({
+            id: `vuln-${id++}`,
+            title: 'Missing Access Control',
+            severity: 'Critical',
+            description: 'The contract has functions that can permanently destroy the contract or change critical state without proper access controls.',
+            recommendation: 'Implement access controls using modifiers like onlyOwner or explicit checks: require(msg.sender == owner, "Not authorized");',
+            codeSnippet: {
+              start: code.indexOf('function ', code.indexOf('selfdestruct')),
+              end: code.indexOf('function ', code.indexOf('selfdestruct')) + 200,
+              code: code.substring(
+                code.indexOf('function ', Math.max(0, code.indexOf('selfdestruct') - 200)),
+                code.indexOf('}', code.indexOf('selfdestruct') + 20) + 1
+              )
+            }
+          });
+        }
+        
+        // 6. Missing event emission for state changes
+        if ((code.includes('mapping') || code.includes(' public ')) && 
+            code.includes('=') && 
+            !code.includes('event ') && 
+            !code.includes('emit ')) {
+          vulnerabilities.push({
+            id: `vuln-${id++}`,
+            title: 'Missing Event Emission',
+            severity: 'Low',
+            description: 'The contract changes state without emitting events. This makes it difficult for off-chain applications to track state changes.',
+            recommendation: 'Define events for important state changes and emit them when those changes occur.',
+            codeSnippet: {
+              start: code.indexOf('contract'),
+              end: code.indexOf('contract') + 200,
+              code: code.substring(
+                code.indexOf('contract'),
+                code.indexOf('{', code.indexOf('contract')) + 200
+              )
+            }
+          });
+        }
+        
+        // 7. Gas inefficiency - expensive operations in loops
+        if (code.includes('for (') || code.includes('for(') || code.includes('while (') || code.includes('while(')) {
+          if (code.match(/for\s*\(.*\)\s*\{[\s\S]*storage/) || 
+              code.match(/while\s*\(.*\)\s*\{[\s\S]*storage/)) {
+            vulnerabilities.push({
+              id: `vuln-${id++}`,
+              title: 'Gas Inefficiency in Loops',
+              severity: data.checkGasEfficiency ? 'Medium' : 'Low',
+              description: 'The contract performs expensive storage operations inside loops, which can lead to high gas costs or even block gas limit issues.',
+              recommendation: 'Cache storage variables in memory before the loop, and update storage only once after the loop.',
+              codeSnippet: {
+                start: code.indexOf('for (') > -1 ? code.indexOf('for (') : code.indexOf('while ('),
+                end: code.indexOf('for (') > -1 ? code.indexOf('for (') + 200 : code.indexOf('while (') + 200,
+                code: code.substring(
+                  code.indexOf('for (') > -1 ? code.indexOf('for (') : code.indexOf('while ('),
+                  code.indexOf('}', (code.indexOf('for (') > -1 ? code.indexOf('for (') : code.indexOf('while (')) + 50) + 1
+                )
+              }
+            });
+          }
+        }
+        
+        // 8. Uninitialized storage pointers (older Solidity versions)
+        if (code.includes('pragma solidity') && 
+            !code.includes('pragma solidity ^0.8') && 
+            !code.includes('pragma solidity 0.8') &&
+            code.match(/\s+\w+\s+\w+;/) && 
+            !code.match(/\s+\w+\s+memory\s+\w+;/) && 
+            !code.match(/\s+\w+\s+storage\s+\w+;/)) {
+          vulnerabilities.push({
+            id: `vuln-${id++}`,
+            title: 'Uninitialized Storage Variables',
+            severity: 'Medium',
+            description: 'The contract contains local variables that might be unintentionally stored in storage rather than memory, which can cause unexpected behavior.',
+            recommendation: 'Explicitly declare variables with the memory keyword when temporary storage is intended.',
+            codeSnippet: {
+              start: code.indexOf('function'),
+              end: code.indexOf('function') + 200,
+              code: code.substring(
+                code.indexOf('function'),
+                code.indexOf('}', code.indexOf('function') + 100) + 1
+              )
+            }
+          });
+        }
+        
+        // If vulnerabilities were found or the contract name contains 'vulnerable'
+        if (vulnerabilities.length > 0 || data.contractName.toLowerCase().includes('vulner')) {
+          // If no vulnerabilities were detected by our simple rules but name suggests vulnerabilities
+          if (vulnerabilities.length === 0 && data.contractName.toLowerCase().includes('vulner')) {
+            vulnerabilities.push(...mockAnalysisResults.vulnerabilities);
+          }
+          
+          resolve({
+            id: `analysis-${Math.floor(Math.random() * 10000)}`,
+            contractName: data.contractName,
+            code: data.contractCode,
+            vulnerabilities: vulnerabilities,
+            reportUrl: '#',
+            timestamp: new Date().toISOString()
           });
         } else {
-          // Return no vulnerabilities for safe contracts
+          // Return safe analysis
           resolve({
-            ...mockSafeAnalysis,
+            id: `analysis-${Math.floor(Math.random() * 10000)}`,
             contractName: data.contractName,
-            code: data.contractCode
+            code: data.contractCode,
+            vulnerabilities: [],
+            reportUrl: '#',
+            timestamp: new Date().toISOString()
           });
         }
       }, 2000); // Simulate analysis time
